@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>詞彙扭蛋機挑戰</title>
+    <!-- 載入 Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* 使用 Noto Sans TC 提供良好的中文顯示 */
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700;900&display=swap');
+        body {
+            font-family: 'Noto Sans TC', sans-serif;
+            background-color: #f0f4f8; /* 淺灰色背景 */
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 1rem;
+        }
+
+        /* 扭蛋機樣式 */
+        .gacha-machine {
+            background-color: #e5e7eb; /* 機器淺灰 */
+            border: 8px solid #374151; /* 機器深灰邊框 */
+            border-radius: 20px;
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.3), inset 0 0 10px rgba(255, 255, 255, 0.5);
+        }
+        
+        /* 扭蛋顯示區域（玻璃窗） */
+        .gacha-window {
+            background-color: rgba(255, 255, 255, 0.9);
+            border: 4px solid #9ca3af;
+            border-radius: 10px;
+            box-shadow: inset 0 0 15px rgba(0, 0, 0, 0.2);
+            position: relative;
+        }
+        
+        /* 扭蛋膠囊樣式 */
+        .capsule {
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1rem;
+            font-weight: 700;
+            color: white;
+            cursor: pointer;
+            box-shadow: 0 5px 10px rgba(0, 0, 0, 0.2);
+            transition: transform 0.2s, opacity 0.3s;
+            position: relative;
+            /* 調整文字大小以適應扭蛋 */
+            font-size: 0.9rem; 
+            line-height: 1.1; 
+            padding: 2px;
+            word-break: break-all; /* 避免長詞語溢出 */
+        }
+
+        /* 膠囊的顏色分界線 */
+        .capsule::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 100%;
+            height: 4px;
+            background-color: rgba(0, 0, 0, 0.15); /* 模擬兩半膠囊的接縫 */
+            border-radius: 50%;
+            z-index: 10;
+        }
+
+        .capsule:hover {
+            transform: scale(1.05);
+            filter: brightness(1.1);
+        }
+
+        /* 扭蛋動畫：落下和開獎 */
+        .capsule.correct-fall {
+            animation: fallAndOpen 1s forwards ease-in-out;
+            pointer-events: none;
+        }
+
+        @keyframes fallAndOpen {
+            0% { transform: translateY(0) scale(1); opacity: 1; }
+            50% { transform: translateY(100px) scale(1.1); opacity: 1; } /* 落到底部 */
+            80% { transform: translateY(120px) scale(0.5); opacity: 0.5; } /* 瞬間縮小消失 */
+            100% { transform: translateY(120px) scale(0); opacity: 0; }
+        }
+
+        /* 扭蛋動畫：錯誤晃動 */
+        .capsule.shake {
+            animation: shake 0.5s ease-in-out;
+        }
+
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            20%, 60% { transform: translateX(-5px); }
+            40%, 80% { transform: translateX(5px); }
+        }
+
+        /* 扭蛋機頂部問題顯示區 */
+        .question-display {
+            background-color: #fcd34d; /* 鮮豔黃色 */
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            color: #78350f; /* 棕色文字 */
+            min-height: 100px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            font-size: 1.125rem;
+            font-weight: 700;
+        }
+
+        /* 扭蛋出口槽 */
+        .drop-slot {
+            height: 30px;
+            background-color: #a1a1aa;
+            border-radius: 0 0 8px 8px;
+            box-shadow: inset 0 5px 10px rgba(0, 0, 0, 0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-top: 10px;
+        }
+
+        /* 彈出訊息區 */
+        #feedback-box {
+            min-height: 40px;
+        }
+    </style>
+</head>
+<body class="p-4 sm:p-8">
+
+    <div id="app" class="max-w-xl w-full mx-auto">
+        <h1 class="text-3xl font-black text-center text-gray-800 mb-6 sm:mb-8">
+            詞彙扭蛋機挑戰
+        </h1>
+
+        <!-- 扭蛋機主體 -->
+        <div class="gacha-machine p-4 sm:p-6 mx-auto w-full max-w-lg">
+
+            <!-- 頂部：問題解釋顯示區 -->
+            <div class="question-display p-4 mb-4">
+                <p id="question-text">準備中...</p>
+            </div>
+
+            <!-- 中間：扭蛋玻璃窗（詞語選項） -->
+            <div id="gacha-window" class="gacha-window p-4 sm:p-6">
+                <div id="capsule-grid" class="grid grid-cols-4 gap-3 sm:gap-4 justify-items-center">
+                    <!-- 扭蛋將在這裡渲染 -->
+                </div>
+            </div>
+
+            <!-- 底部：出獎槽和操作區 -->
+            <div class="drop-slot text-white font-bold text-sm">
+                點擊正確的詞語扭蛋！
+            </div>
+
+            <div id="feedback-box" class="text-center font-bold mt-4 flex justify-between items-center text-lg">
+                <span id="score-display" class="text-gray-700">得分: 0 / 12</span>
+                <button id="restart-btn" class="px-4 py-2 bg-red-600 text-white font-bold rounded-lg hover:bg-red-700 transition duration-300 shadow-md">
+                    重設
+                </button>
+            </div>
+            <p id="message" class="text-center h-5 text-red-600 font-semibold mt-2"></p>
+        </div>
+
+        <!-- 勝利彈窗 (Modal) -->
+        <div id="modal" class="hidden fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50 p-4" onclick="window.game.restartGame()">
+            <div class="bg-white p-8 rounded-xl shadow-2xl text-center max-w-sm w-full transform transition-all scale-100" onclick="event.stopPropagation()">
+                <h2 class="text-3xl font-extrabold text-green-600 mb-4">大挑戰完成！🎊</h2>
+                <p class="text-xl text-gray-700 mb-6">您成功配對了所有詞語！</p>
+                <button onclick="window.game.restartGame()" class="px-8 py-3 bg-red-600 text-white font-bold rounded-full hover:bg-red-700 transition duration-300 shadow-lg transform hover:scale-105">
+                    再玩一次
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const gameData = [
+            { id: 1, term: '泰國', definition: '國名，位於東南亞中南半島中部' },
+            { id: 2, term: '華麗', definition: '豪華美麗' },
+            { id: 3, term: '和尚', definition: '泛稱男性僧侶' },
+            { id: 4, term: '逛逛', definition: '隨意走動' }, 
+            { id: 5, term: '埃及', definition: '國名，位於東北非，文明古國之一' },
+            { id: 6, term: '尼羅河', definition: '世界最長的河流，古文明發祥地之一' },
+            { id: 7, term: '地勢', definition: '地面高低起伏的形勢' },
+            { id: 8, term: '低窪', definition: '地勢凹陷，比四周低下' },
+            { id: 9, term: '築堤', definition: '建築堤防' },
+            { id: 10, term: '防潮', definition: '防止潮水入侵或防止潮溼' },
+            { id: 11, term: '鬱金香', definition: '植物名，花似倒鐘形，主供觀賞' },
+            { id: 12, term: '划船', definition: '划槳使船行動' },
+        ];
+
+        // 扭蛋顏色列表
+        const capsuleColors = [
+            '#ef4444', '#f97316', '#eab308', '#22c55e', '#06b6d4', '#3b82f6', 
+            '#8b5cf6', '#d946ef', '#f43f5e', '#65a30d', '#facc15', '#38bdf8'
+        ];
+
+        class GachaQuiz {
+            constructor() {
+                this.questionText = document.getElementById('question-text');
+                this.capsuleGrid = document.getElementById('capsule-grid');
+                this.scoreDisplay = document.getElementById('score-display');
+                this.message = document.getElementById('message');
+                this.modal = document.getElementById('modal');
+                this.restartBtn = document.getElementById('restart-btn');
+
+                this.allQuestions = []; // 所有問題（解釋）
+                this.currentQuestion = null;
+                this.availableTerms = []; // 所有詞語選項
+                this.score = 0;
+                this.isLocked = false;
+                
+                this.restartBtn.addEventListener('click', () => this.restartGame());
+                
+                this.initGame();
+                window.game = this; // 讓 Modal 存取
+            }
+
+            /**
+             * 初始遊戲設定：準備資料、洗牌、開始第一輪
+             */
+            initGame() {
+                this.allQuestions = this.shuffle([...gameData]); // 複製並洗牌問題列表
+                this.availableTerms = this.shuffle([...gameData]); // 複製並洗牌詞語選項
+
+                this.score = 0;
+                this.isLocked = false;
+                this.modal.classList.add('hidden');
+                this.updateScoreDisplay();
+                this.message.textContent = '';
+
+                this.renderCapsules();
+                this.loadNextQuestion();
+            }
+
+            /**
+             * 陣列洗牌函式 (Fisher-Yates)
+             */
+            shuffle(array) {
+                for (let i = array.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [array[i], array[j]] = [array[j], array[i]];
+                }
+                return array;
+            }
+
+            /**
+             * 渲染所有詞語扭蛋
+             */
+            renderCapsules() {
+                this.capsuleGrid.innerHTML = '';
+                this.availableTerms.forEach((termData, index) => {
+                    const capsule = document.createElement('div');
+                    capsule.className = 'capsule transition duration-500';
+                    capsule.dataset.id = termData.id;
+                    capsule.dataset.term = termData.term;
+                    capsule.style.backgroundColor = capsuleColors[index % capsuleColors.length];
+                    
+                    // *** 關鍵修改：直接顯示詞語 ***
+                    capsule.textContent = termData.term;
+                    capsule.setAttribute('title', `點擊選擇詞語：${termData.term}`);
+                    
+                    capsule.addEventListener('click', this.handleCapsuleClick.bind(this));
+                    this.capsuleGrid.appendChild(capsule);
+                });
+            }
+
+            /**
+             * 載入下一題問題（解釋）
+             */
+            loadNextQuestion() {
+                this.message.textContent = '';
+                if (this.allQuestions.length === 0) {
+                    // 遊戲結束
+                    setTimeout(() => this.modal.classList.remove('hidden'), 500);
+                    this.questionText.textContent = '挑戰完成！';
+                    this.isLocked = true;
+                    return;
+                }
+                
+                // 取出下一題
+                this.currentQuestion = this.allQuestions.pop();
+                this.questionText.textContent = this.currentQuestion.definition;
+            }
+
+            /**
+             * 處理扭蛋點擊事件
+             * @param {Event} e - 點擊事件
+             */
+            handleCapsuleClick(e) {
+                if (this.isLocked || !this.currentQuestion) return;
+
+                const clickedCapsule = e.currentTarget;
+                const clickedId = parseInt(clickedCapsule.dataset.id);
+
+                // 鎖定操作板面，直到處理完畢
+                this.isLocked = true;
+
+                // 檢查是否配對成功
+                if (clickedId === this.currentQuestion.id) {
+                    // ✅ 正確：執行成功動畫和邏輯
+                    this.score++;
+                    this.message.textContent = '👍 正確！進入下一題。';
+                    this.message.classList.remove('text-red-600');
+                    this.message.classList.add('text-green-600');
+                    
+                    clickedCapsule.classList.add('correct-fall');
+
+                    setTimeout(() => {
+                        // 移除已配對的扭蛋，並載入下一題
+                        clickedCapsule.remove();
+                        this.updateAvailableTerms(clickedId);
+                        this.isLocked = false;
+                        this.loadNextQuestion();
+                        // 重新渲染剩餘扭蛋以填補空位 (雖然CSS grid會自動處理，但這裡保留邏輯上的正確性)
+                        this.renderCapsules(); 
+                    }, 1000); // 等待動畫完成
+                    
+                } else {
+                    // ❌ 錯誤：執行晃動動畫和邏輯
+                    this.message.textContent = `❌ 錯誤，「${clickedCapsule.dataset.term}」不是正確答案。請再試一次！`;
+                    this.message.classList.remove('text-green-600');
+                    this.message.classList.add('text-red-600');
+
+                    clickedCapsule.classList.add('shake');
+                    setTimeout(() => {
+                        clickedCapsule.classList.remove('shake');
+                        this.isLocked = false; // 解鎖，讓使用者可以再次點擊
+                    }, 1000); 
+                }
+                
+                this.updateScoreDisplay();
+            }
+
+            /**
+             * 移除已配對的詞語選項 (用於跟蹤哪些詞語仍在遊戲中)
+             */
+            updateAvailableTerms(matchedId) {
+                 this.availableTerms = this.availableTerms.filter(term => term.id !== matchedId);
+            }
+
+            /**
+             * 更新分數顯示
+             */
+            updateScoreDisplay() {
+                const total = gameData.length;
+                this.scoreDisplay.textContent = `得分: ${this.score} / ${total}`;
+            }
+
+            /**
+             * 重新開始遊戲
+             */
+            restartGame() {
+                this.capsuleGrid.innerHTML = '';
+                this.initGame();
+            }
+        }
+
+        // 頁面載入完成後啟動遊戲
+        window.onload = () => {
+            new GachaQuiz();
+        };
+    </script>
+</body>
+</html>
